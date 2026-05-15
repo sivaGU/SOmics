@@ -1,4 +1,4 @@
-import streamlit as st 
+import streamlit as st
 import pandas as pd
 import numpy as np
 import joblib
@@ -17,14 +17,6 @@ from PIL import Image
 import tifffile
 from somics_docs import OVERVIEW, MODEL_ARCH, GUI_GUIDE
 from somics_inference_adapted import run_inference_from_bytes, log1p_cpm
-
-# ==========================================
-# 0. DEMO FILE SETUP
-# ==========================================
-@st.cache_resource
-def ensure_demo_files():
-    Path("demo_zips").mkdir(exist_ok=True)
-    return True
 
 # ==========================================
 # 1. PAGE SETUP & THEME
@@ -83,10 +75,17 @@ st.markdown("""
 # ==========================================
 @st.cache_resource
 def load_assets():
+    # Try both old and new filename conventions
+    rf_candidates  = ['somics_rf.pkl', 'somics_rf (1).pkl']
+    lr_candidates  = ['somics_lr.pkl', 'somics_lr (1).pkl']
+    feat_candidates = ['model_features_1000.json', 'model_features_1000 (1).json']
     try:
-        rf  = joblib.load('somics_rf (1).pkl')['model']
-        lr  = joblib.load('somics_lr (1).pkl')['model']
-        with open('model_features_1000 (1).json') as f:
+        rf_path   = next(p for p in rf_candidates   if os.path.exists(p))
+        lr_path   = next(p for p in lr_candidates   if os.path.exists(p))
+        feat_path = next(p for p in feat_candidates if os.path.exists(p))
+        rf  = joblib.load(rf_path)['model']
+        lr  = joblib.load(lr_path)['model']
+        with open(feat_path) as f:
             feats = json.load(f)['model_features_ordered']
         with open('hub_genes.json') as f:
             hubs = json.load(f)
@@ -137,41 +136,6 @@ def load_tissue_image(uploaded_file):
         return Image.fromarray(arr)
     return Image.open(io.BytesIO(raw))
 
-def overlay_spots_on_image(pil_image, final_df, scale_factor=1.0, spot_opacity=0.85, spot_size=8):
-    img_w, img_h = pil_image.size
-    buf = io.BytesIO()
-    pil_image.save(buf, format='PNG', optimize=False, compress_level=1)
-    b64 = "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
-    fig = go.Figure()
-    fig.add_layout_image(
-        source=b64, x=0, y=0, xref="x", yref="y",
-        sizex=img_w, sizey=img_h, xanchor="left", yanchor="top",
-        layer="below", opacity=1.0
-    )
-    fig.add_trace(go.Scatter(
-        x=final_df['pxl_col'].values * scale_factor,
-        y=final_df['pxl_row'].values * scale_factor,
-        mode='markers',
-        marker=dict(
-            color=final_df['Score'].values,
-            colorscale=[[0,"#E8000D"],[0.5,"#F5F5F5"],[1,"#0077B6"]],
-            cmin=0, cmax=1, size=spot_size, opacity=spot_opacity,
-            colorbar=dict(title="Immune Score", thickness=20, len=0.75),
-            line=dict(width=0, color="black"),
-        ),
-        text=final_df['barcode'].values,
-        hovertemplate="<b>%{text}</b><br>Score: %{marker.color:.3f}<extra></extra>",
-        showlegend=False
-    ))
-    fig.update_layout(
-        xaxis=dict(range=[0,img_w], showgrid=False, zeroline=False, visible=False),
-        yaxis=dict(range=[img_h,0], showgrid=False, zeroline=False, visible=False, scaleanchor="x"),
-        margin=dict(l=0,r=0,t=40,b=0), height=900,
-        title=dict(text="CAF-Immune Spatial Map — Tissue Overlay", font=dict(size=20)),
-        plot_bgcolor="black",
-    )
-    return fig
-
 def make_scatter(df, title, model_used, height=900, width=1200):
     fig = px.scatter(
         df, x='pxl_col', y='pxl_row', color='Score',
@@ -208,29 +172,59 @@ def show_metrics(df):
     with c4: st.metric("Mean Score",  f"{df['Score'].mean():.3f}")
 
 # ==========================================
-# 5. GEO BENCHMARKING HELPERS
+# 5. DEMO DATA LOADER
 # ==========================================
+# Repo structure: demo_data/HGSC/308/, demo_data/HGSC/309/, etc.
+DEMO_SAMPLES = {
+    "308_hgsc": {"name":"HGSC Sample 308", "path":"demo_data/HGSC/308"},
+    "309_hgsc": {"name":"HGSC Sample 309", "path":"demo_data/HGSC/309"},
+    "310_hgsc": {"name":"HGSC Sample 310", "path":"demo_data/HGSC/310"},
+    "311_hgsc": {"name":"HGSC Sample 311", "path":"demo_data/HGSC/311"},
+}
+
+@st.cache_data
+def load_demo_results(_rf, _lr, _feats, sample_id, model_type="Random Forest"):
+    d = DEMO_SAMPLES[sample_id]["path"]
+
+    def rgz(p):
+        with gzip.open(p,'rb') as f: return f.read()
+
+    raw_mtx  = rgz(os.path.join(d, "matrix.mtx.gz"))
+    raw_feat = rgz(os.path.join(d, "features.tsv.gz"))
+    raw_bc   = rgz(os.path.join(d, "barcodes.tsv.gz"))
+
+    pp1 = os.path.join(d, "tissue_positions_list.csv")
+    pp2 = os.path.join(d, "tissue_positions.csv")
+    pos_df = parse_positions(open(pp1 if os.path.exists(pp1) else pp2,'rb').read(), "")
+
+    with open(os.path.join(d, "scalefactors_json.json")) as f:
+        scale = json.load(f).get("tissue_lowres_scalef", 0.05)
+
+    img   = Image.open(os.path.join(d, "tissue_lowres_image.png"))
+    model = _rf if model_type == "Random Forest" else _lr
+    df    = run_inference_from_bytes(raw_mtx, raw_feat, raw_bc, pos_df, model, _feats)
+    return df, img, scale
+
+# ==========================================
+# 6. GEO BENCHMARKING HELPERS
+# ==========================================
+# Repo structure: geo/SP2/, geo/SP3/, etc.
 GEO_SAMPLES = {
-    "SP1": {"gsm":"GSM6506110","label":"SP1 — GSM6506110 (Benchmarking data 1)"},
-    "SP2": {"gsm":"GSM6506111","label":"SP2 — GSM6506111 (Benchmarking data 2)"},
-    "SP3": {"gsm":"GSM6506112","label":"SP3 — GSM6506112 (Benchmarking data 3)"},
-    "SP4": {"gsm":"GSM6506113","label":"SP4 — GSM6506113 (Benchmarking data 4)"},
-    "SP5": {"gsm":"GSM6506114","label":"SP5 — GSM6506114 (Benchmarking data 5)"},
-    "SP6": {"gsm":"GSM6506115","label":"SP6 — GSM6506115 (Benchmarking data 6)"},
-    "SP7": {"gsm":"GSM6506116","label":"SP7 — GSM6506116 (Benchmarking data 7)"},
-    "SP8": {"gsm":"GSM6506117","label":"SP8 — GSM6506117 (Benchmarking data 8)"},
+    "SP2": {"gsm":"GSM6506111","label":"SP2 — GSM6506111"},
+    "SP3": {"gsm":"GSM6506112","label":"SP3 — GSM6506112"},
+    "SP5": {"gsm":"GSM6506114","label":"SP5 — GSM6506114"},
+    "SP6": {"gsm":"GSM6506115","label":"SP6 — GSM6506115"},
 }
 
 def _find_geo_file(gsm, sp, suffix):
     filename = f"{gsm}_{sp}_{suffix}"
     for path in [
-        os.path.join("demo_zips","geo",sp,filename),
-        os.path.join("demo_zips","geo",filename),
-        filename,
+        os.path.join("geo", sp, filename),
+        os.path.join("geo", filename),
     ]:
         if os.path.exists(path):
             return path
-    raise FileNotFoundError(f"Cannot find '{filename}'.\nExpected at: demo_zips/geo/{sp}/{filename}")
+    raise FileNotFoundError(f"Cannot find '{filename}'.\nExpected at: geo/{sp}/{filename}")
 
 @st.cache_data(show_spinner=False)
 def load_geo_sample(_model, _model_features, sp_key, model_type):
@@ -271,14 +265,14 @@ def load_geo_sample(_model, _model_features, sp_key, model_type):
     return final_df, pil_image, scale
 
 # ==========================================
-# 6. SIDEBAR
+# 7. SIDEBAR
 # ==========================================
 with st.sidebar:
     st.markdown("## SOmics")
     page = st.radio("Go to:", ["Home","Demo Walkthrough","Classify - User Analysis","Documentation"])
 
 # ==========================================
-# 7. PAGE: HOME
+# 8. PAGE: HOME
 # ==========================================
 if page == "Home":
     st.markdown('<div class="main-header">SOmics</div>', unsafe_allow_html=True)
@@ -291,7 +285,7 @@ if page == "Home":
         st.error(f"Error loading method.png: {e}")
 
 # ==========================================
-# 8. PAGE: DEMO WALKTHROUGH
+# 9. PAGE: DEMO WALKTHROUGH
 # ==========================================
 elif page == "Demo Walkthrough":
     st.markdown('<div class="main-header">Interactive Demo</div>', unsafe_allow_html=True)
@@ -303,35 +297,7 @@ elif page == "Demo Walkthrough":
 
     # ── TAB 1: DEMO SAMPLES ──────────────────────────────────────────────────
     with tab_demo:
-        st.write("This demo runs the full SOmics pipeline on real ovarian cancer spatial transcriptomics samples. All files are bundled — no upload required.")
-
-        DEMO_SAMPLES = {
-            "308":      {"name":"OCS Sample 308"},
-            "308_hgsc": {"name":"HGSC Sample 308"},
-            "309":      {"name":"OCS Sample 309"},
-            "309_hgsc": {"name":"HGSC Sample 309"},
-            "310":      {"name":"OCS Sample 310"},
-            "310_hgsc": {"name":"HGSC Sample 310"},
-            "311":      {"name":"OCS Sample 311"},
-            "311_hgsc": {"name":"HGSC Sample 311"},
-        }
-
-        @st.cache_data
-        def load_demo_results(_rf, _lr, _feats, sample_id, model_type="Random Forest"):
-            d = f"demo_zips/{sample_id}"
-            def rgz(p):
-                with gzip.open(p,'rb') as f: return f.read()
-            raw_mtx  = rgz(os.path.join(d,"matrix.mtx.gz"))
-            raw_feat = rgz(os.path.join(d,"features.tsv.gz"))
-            raw_bc   = rgz(os.path.join(d,"barcodes.tsv.gz"))
-            pp1, pp2 = os.path.join(d,"tissue_positions_list.csv"), os.path.join(d,"tissue_positions.csv")
-            pos_df   = parse_positions(open(pp1 if os.path.exists(pp1) else pp2,'rb').read(), "")
-            with open(os.path.join(d,"scalefactors_json.json")) as f:
-                scale = json.load(f).get("tissue_lowres_scalef", 0.05)
-            img   = Image.open(os.path.join(d,"tissue_lowres_image.png"))
-            model = _rf if model_type == "Random Forest" else _lr
-            df    = run_inference_from_bytes(raw_mtx, raw_feat, raw_bc, pos_df, model, _feats)
-            return df, img, scale
+        st.write("This demo runs the full SOmics pipeline on real HGSC ovarian cancer spatial transcriptomics samples. All files are bundled — no upload required.")
 
         c1, c2 = st.columns(2)
         with c1:
@@ -376,7 +342,7 @@ elif page == "Demo Walkthrough":
             with col_info:
                 st.markdown("### About this sample")
                 st.write("""
-                Real ovarian cancer biopsy via 10x Visium spatial transcriptomics.
+                Real HGSC ovarian cancer biopsy via 10x Visium spatial transcriptomics.
                 - **Score near 0** — CAF-dominant (coral)
                 - **Score near 1** — Immune-dominant (turquoise)
                 """)
@@ -423,11 +389,11 @@ elif page == "Demo Walkthrough":
                     with st.expander("Traceback"): st.code(traceback.format_exc())
 
         if "bench_results" in st.session_state:
-            df     = st.session_state["bench_results"]
+            df      = st.session_state["bench_results"]
             sp_used = st.session_state["bench_sp_key"]
-            mused  = st.session_state["bench_model_used"]
-            meta   = GEO_SAMPLES[sp_used]
-            label  = meta["label"]
+            mused   = st.session_state["bench_model_used"]
+            meta    = GEO_SAMPLES[sp_used]
+            label   = meta["label"]
 
             st.divider()
             show_metrics(df)
@@ -465,7 +431,7 @@ elif page == "Demo Walkthrough":
                 st.rerun()
 
 # ==========================================
-# 9. PAGE: CLASSIFY - USER ANALYSIS
+# 10. PAGE: CLASSIFY - USER ANALYSIS
 # ==========================================
 elif page == "Classify - User Analysis":
     st.markdown('<div class="main-header">Classify - User Analysis</div>', unsafe_allow_html=True)
@@ -481,21 +447,22 @@ elif page == "Classify - User Analysis":
             if st.button("Run Example", type="primary", key="run_example"):
                 with st.spinner("Running analysis..."):
                     try:
-                        data_path = next(
-                            (p for p in ['','user-data/','/mount/src/somics_/user-data/']
-                             if os.path.exists(os.path.join(p,'HGSC_308_coordinates_for_CARD.csv'))),
-                            None
-                        )
-                        if data_path is None:
-                            st.error("Example data files not found.")
+                        # Look in user-data/ folder
+                        data_path = 'user-data'
+                        coord_file = os.path.join(data_path, 'HGSC_308_coordinates_for_CARD.csv')
+                        if not os.path.exists(coord_file):
+                            st.error("Example data files not found in user-data/ folder.")
                             st.stop()
+
                         with gzip.open(os.path.join(data_path,'barcodes 308 (3).tsv.gz'),'rb') as f: raw_bc   = f.read()
                         with gzip.open(os.path.join(data_path,'features 308.tsv.gz'),    'rb') as f: raw_feat = f.read()
                         with gzip.open(os.path.join(data_path,'matrix (2).mtx.gz'),      'rb') as f: raw_mtx  = f.read()
-                        pos_df = pd.read_csv(os.path.join(data_path,'HGSC_308_coordinates_for_CARD.csv'))
+
+                        pos_df = pd.read_csv(coord_file)
                         pos_df = pos_df.rename(columns={'x':'pxl_col','y':'pxl_row','Spot_ID':'barcode'})
                         for col, val in [('in_tissue',1),('array_row',0),('array_col',0)]:
                             if col not in pos_df.columns: pos_df[col] = val
+
                         active = rf_model if example_model == "Random Forest" else lr_model
                         df = run_inference_from_bytes(raw_mtx, raw_feat, raw_bc, pos_df, active, model_features)
                         st.session_state.example_results    = df
@@ -596,7 +563,7 @@ elif page == "Classify - User Analysis":
                                        label_visibility="collapsed")
         mtx_file = feat_file = bc_file = None
 
-    scale_factor, spot_size, spot_opacity = 1.0, 8, 0.85
+    scale_factor = 1.0
 
     mtx_ready = input_mode == "MTX (raw 10x Visium)" and all(f is not None for f in [mtx_file, feat_file, bc_file, pos_file])
     csv_ready = input_mode == "CSV (pre-converted)"   and all(f is not None for f in [expr_file, pos_file])
@@ -636,13 +603,6 @@ elif page == "Classify - User Analysis":
                         'live_results': df, 'live_model_type': model_type,
                         'live_scale_factor': resolved_scale,
                     })
-                    if image_file is not None:
-                        image_file.seek(0)
-                        st.session_state['live_image_bytes'] = image_file.read()
-                        st.session_state['live_image_name']  = image_file.name
-                    else:
-                        st.session_state.pop('live_image_bytes', None)
-                        st.session_state.pop('live_image_name', None)
 
             if 'live_results' in st.session_state:
                 st.markdown("---")
@@ -673,12 +633,12 @@ elif page == "Classify - User Analysis":
 
     if 'live_results' in st.session_state:
         if st.button("Clear Results", key="clear_user_upload"):
-            for k in ['live_results','live_model_type','live_image_bytes','live_image_name','live_scale_factor']:
+            for k in ['live_results','live_model_type','live_scale_factor']:
                 st.session_state.pop(k, None)
             st.rerun()
 
 # ==========================================
-# 10. PAGE: DOCUMENTATION
+# 11. PAGE: DOCUMENTATION
 # ==========================================
 elif page == "Documentation":
     st.markdown('<div class="main-header">Documentation</div>', unsafe_allow_html=True)
