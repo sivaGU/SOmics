@@ -180,6 +180,12 @@ A score distribution histogram and four summary metrics are shown below the
 spatial map. Click "Download Demo Results" to export the barcode-level scores as
 a CSV. Click "Reset Demo" to clear results and run again with a different model.
 
+Due to the high amount storage space of the OCS samples used during 
+model training, the demo walkthrough contains only HGSC samples. 
+
+The benchamrking section of the demo walkthrough contains datasets used for the benchmarking process. 
+The datasets included were picked out according to sample storage size. 
+
 ---
 
 ### User Analysis Page
