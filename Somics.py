@@ -18,9 +18,9 @@ import tifffile
 from somics_docs import OVERVIEW, MODEL_ARCH, GUI_GUIDE
 from somics_inference_adapted import run_inference_from_bytes, log1p_cpm
 
-# ==========================================
-# 1. PAGE SETUP & THEME
-# ==========================================
+
+# 1. Page setup and theme
+
 st.set_page_config(page_title="SOmics: CAF-Immune", page_icon="🧬", layout="wide")
 
 st.markdown("""
@@ -70,9 +70,9 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# ==========================================
-# 2. MODEL LOADING
-# ==========================================
+
+# 2. Loading the models used 
+
 @st.cache_resource
 def load_assets():
     # Try both old and new filename conventions
@@ -97,9 +97,9 @@ def load_assets():
 rf_model, lr_model, model_features, hub_genes_data = load_assets()
 assets_loaded = all(x is not None for x in [rf_model, lr_model, model_features, hub_genes_data])
 
-# ==========================================
-# 3. INFERENCE HELPERS
-# ==========================================
+
+# 3. Inference Helpers
+
 def run_inference_csv(df, model, features):
     df = df.copy()
     df.columns = [str(c).split('.')[0] if str(c).startswith('ENSG') else str(c) for c in df.columns]
@@ -122,9 +122,9 @@ def parse_positions(pos_bytes, filename):
         pos['in_tissue'] = 1
     return pos
 
-# ==========================================
-# 4. IMAGE HELPERS
-# ==========================================
+ 
+# Help load the image
+
 def load_tissue_image(uploaded_file):
     raw = uploaded_file.read()
     if uploaded_file.name.lower().endswith(('.tif','.tiff')):
@@ -171,9 +171,9 @@ def show_metrics(df):
     with c3: st.metric("CAF-high",    f"{caf_n} ({caf_n/len(df):.1%})")
     with c4: st.metric("Mean Score",  f"{df['Score'].mean():.3f}")
 
-# ==========================================
-# 5. DEMO DATA LOADER
-# ==========================================
+
+# Load the demo data
+
 # Repo structure: demo_data/HGSC/308/, demo_data/HGSC/309/, etc.
 DEMO_SAMPLES = {
     "308_hgsc": {"name":"HGSC Sample 308", "path":"demo_data/HGSC/308"},
@@ -205,9 +205,9 @@ def load_demo_results(_rf, _lr, _feats, sample_id, model_type="Random Forest"):
     df    = run_inference_from_bytes(raw_mtx, raw_feat, raw_bc, pos_df, model, _feats)
     return df, img, scale
 
-# ==========================================
-# 6. GEO BENCHMARKING HELPERS
-# ==========================================
+
+# 6. Load the benchmarking data obtained fro GEO
+
 # Repo structure: geo/SP2/, geo/SP3/, etc.
 GEO_SAMPLES = {
     "SP2": {"gsm":"GSM6506111","label":"SP2 — GSM6506111"},
@@ -264,9 +264,9 @@ def load_geo_sample(_model, _model_features, sp_key, model_type):
         final_df = final_df.rename(columns={"pCAF":"Score"})
     return final_df, pil_image, scale
 
-# ==========================================
+
 # 7. SIDEBAR
-# ==========================================
+
 with st.sidebar:
     st.markdown("## SOmics")
     page = st.radio("Go to:", ["Home","Demo Walkthrough","Classify - User Analysis","Documentation"])
@@ -283,9 +283,17 @@ if page == "Home":
         st.error("method.png not found.")
     except Exception as e:
         st.error(f"Error loading method.png: {e}")
+    
+    st.markdown("---")
+    st.markdown("### Contact Information")
+    st.markdown(
+        "**For Contact:** Dr. Sivanesan Dakshanamurthy, PhD, MBA. "
+        "[sivanesan@innsciteai.com](mailto:sivanesan@innsciteai.com); "
+        "[sd233@georgetown.edu](mailto:sd233@georgetown.edu)"
+    )
 
-# ==========================================
-# 9. PAGE: DEMO WALKTHROUGH
+
+# DEMO WALKTHROUGH
 # ==========================================
 elif page == "Demo Walkthrough":
     st.markdown('<div class="main-header">Interactive Demo</div>', unsafe_allow_html=True)
@@ -295,7 +303,7 @@ elif page == "Demo Walkthrough":
 
     tab_demo, tab_bench = st.tabs(["Demo Samples", "GEO Benchmarking Datasets"])
 
-    # ── TAB 1: DEMO SAMPLES ──────────────────────────────────────────────────
+    # DEMO SAMPLES
     with tab_demo:
         st.write("This demo runs the full SOmics pipeline on real HGSC ovarian cancer spatial transcriptomics samples. All files are bundled — no upload required.")
 
@@ -357,7 +365,7 @@ elif page == "Demo Walkthrough":
                     st.session_state.pop(k, None)
                 st.rerun()
 
-    # ── TAB 2: GEO BENCHMARKING ───────────────────────────────────────────────
+    # GEO BENCHMARKING
     with tab_bench:
         st.write("Independent benchmarking on published GEO datasets. These are real ovarian cancer Visium samples not used during model training.")
 
@@ -430,8 +438,8 @@ elif page == "Demo Walkthrough":
                     st.session_state.pop(k, None)
                 st.rerun()
 
-# ==========================================
-# 10. PAGE: CLASSIFY - USER ANALYSIS
+
+# User analysis page
 # ==========================================
 elif page == "Classify - User Analysis":
     st.markdown('<div class="main-header">Classify - User Analysis</div>', unsafe_allow_html=True)
@@ -637,8 +645,8 @@ elif page == "Classify - User Analysis":
                 st.session_state.pop(k, None)
             st.rerun()
 
-# ==========================================
-# 11. PAGE: DOCUMENTATION
+
+#  DOCUMENTATION
 # ==========================================
 elif page == "Documentation":
     st.markdown('<div class="main-header">Documentation</div>', unsafe_allow_html=True)
