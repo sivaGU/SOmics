@@ -163,7 +163,7 @@ def make_histogram(df, title, height=500):
     return fig
 
 def show_metrics(df):
-    immune_n = (df['Score'] > 0.5).sum()
+    immune_n = (df['Score'] < 0.5).sum()
     caf_n    = len(df) - immune_n
     c1, c2, c3, c4 = st.columns(4)
     with c1: st.metric("Total Spots", len(df))
