@@ -3,8 +3,8 @@
 These are **cleaned archival copies**, not independently validated runnable notebooks. The original code cells and their order are retained, except for broken attempts to write/import `somics_spatial_inference.py`, unrelated directory search commands, and exploratory inference cells that emitted errors. Notebook outputs were cleared. Original notebooks should be preserved separately.
 
 ## Files
-- `notebooks/SOmics_spatial_pseudosamples_cleaned.ipynb`: original training/spatial analysis, pseudo sample generation (including final 160 pseudo samples), and plotting.
-- `notebooks/SOmics_reviewer_analyses_cleaned.ipynb`: original training/spatial analysis, TCGA bootstrap confidence intervals, tissue level bootstrap, leave one out, and normalization sensitivity.
+- `SOmics_spatial_pseudosamples.ipynb`: original training/spatial analysis, pseudo sample generation (including final 160 pseudo samples), and plotting.
+- `SOmics_reviewer_analyses.ipynb`: original training/spatial analysis, TCGA bootstrap confidence intervals, tissue level bootstrap, leave one out, and normalization sensitivity.
 
 ## Important limitations and setup still required
 1. These notebooks use absolute Colab Drive paths such as `/content/drive/MyDrive/ML_ExternalVal_FINAL/` and separate TCGA/Visium input folders. Replace or configure these paths to point to your own downloaded data.
