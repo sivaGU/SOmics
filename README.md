@@ -55,6 +55,6 @@ The application should open in a web browser. Users can upload 10x Genomics Visi
 
 ### 5. Reproducing the manuscript analyses
 
-The machine learning analyses supporting the manuscript will be provided in the `reviewer_revision_analyses` folder.
+The machine learning analyses supporting the manuscript are provided in the `reviewer_revision_analyses` folder.
 
-These notebooks include model evaluation, bootstrap confidence intervals, pseudo-sample robustness testing, and normalization sensitivity analysis. Researchers should obtain the original datasets from the sources listed in the manuscript and configure the input paths before running the notebooks.
+These notebooks include model evaluation, bootstrap confidence intervals, pseudo sample robustness testing, and normalization sensitivity analysis. Researchers should obtain the original datasets from the sources listed in the manuscript and configure the input paths before running the notebooks.
