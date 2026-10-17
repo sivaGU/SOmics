@@ -141,7 +141,7 @@ def make_scatter(df, title, model_used, height=900, width=1200):
         df, x='pxl_col', y='pxl_row', color='Score',
         color_continuous_scale=["#E8000D","#F5F5F5","#0077B6"],
         title=title,
-        labels={'Score':'Immune Score','pxl_col':'X Position','pxl_row':'Y Position'},
+        labels={'Score':'P(CAF high)','pxl_col':'X Position','pxl_row':'Y Position'},,
         height=height, width=width,
     )
     fig.update_traces(marker=dict(size=6, line=dict(width=0.5, color="black")))
@@ -346,7 +346,7 @@ elif page == "Demo Walkthrough":
 
             col_hist, col_info = st.columns([2,1])
             with col_hist:
-                st.plotly_chart(make_histogram(df, "Distribution of CAF-Immune Scores Across Spots"), use_container_width=True)
+                st.plotly_chart(make_histogram(df, "Distribution of CAF Immune Scores Across Spots"), use_container_width=True)
             with col_info:
                 st.markdown("### About this sample")
                 st.write("""
@@ -414,7 +414,7 @@ elif page == "Demo Walkthrough":
             st.divider()
             col_hist, col_info = st.columns([2,1])
             with col_hist:
-                st.plotly_chart(make_histogram(df, "Distribution of CAF-Immune Scores"), use_container_width=True)
+                st.plotly_chart(make_histogram(df, "Distribution of CAF Immune Scores"), use_container_width=True)
             with col_info:
                 st.markdown("### Dataset Info")
                 st.markdown(f"""
@@ -486,7 +486,7 @@ elif page == "Classify - User Analysis":
                 fig = px.scatter(df, x='pxl_col', y='pxl_row', color='Score',
                     color_continuous_scale=["#E8000D","#F5F5F5","#0077B6"],
                     title=f"HGSC 308 - {st.session_state.example_model_type}",
-                    labels={'Score':'Immune Score'}, height=600, width=900)
+                    labels={'Score':'P(CAF high)'}, height=600, width=900)
                 fig.update_traces(marker=dict(size=5, line=dict(width=0.5, color="black")))
                 fig.update_layout(font=dict(size=13), title_font_size=16)
                 fig.update_yaxes(autorange="reversed")
