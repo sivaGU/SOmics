@@ -141,7 +141,7 @@ def make_scatter(df, title, model_used, height=900, width=1200):
         df, x='pxl_col', y='pxl_row', color='Score',
         color_continuous_scale=["#E8000D","#F5F5F5","#0077B6"],
         title=title,
-        labels={'Score':'P(CAF high)','pxl_col':'X Position','pxl_row':'Y Position'},,
+        labels={'Score':'P(CAF high)','pxl_col':'X Position','pxl_row':'Y Position'},
         height=height, width=width,
     )
     fig.update_traces(marker=dict(size=6, line=dict(width=0.5, color="black")))
