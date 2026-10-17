@@ -154,7 +154,7 @@ def make_histogram(df, title, height=500):
         df, x='Score', nbins=40,
         color_discrete_sequence=["#0077B6"],
         title=title,
-        labels={'Score':'Immune Score (0=CAF-high, 1=Immune-high)'},
+        labels={'Score':'P(CAF high) (0=Immune high, 1=CAF high)'},
         height=height,
     )
     fig.update_layout(font=dict(size=13), title_font_size=18, bargap=0.05)
@@ -351,8 +351,8 @@ elif page == "Demo Walkthrough":
                 st.markdown("### About this sample")
                 st.write("""
                 Real HGSC ovarian cancer biopsy via 10x Visium spatial transcriptomics.
-                - **Score near 0** — CAF-dominant (coral)
-                - **Score near 1** — Immune-dominant (turquoise)
+                - **Score near 0** — Immune high transcriptional state
+                - **Score near 1** — CAF high transcriptional state
                 """)
 
             with st.expander("Download Demo Results"):
@@ -626,7 +626,7 @@ elif page == "Classify - User Analysis":
                 c1, c2, c3 = st.columns(3)
                 with c1: st.metric("Total Spots", len(df))
                 with c2:
-                    immune_n = (df['Score'] > 0.5).sum()
+                    immune_n = (df['Score'] < 0.5).sum()
                     st.metric("Immune-high Spots", f"{immune_n} ({immune_n/len(df):.1%})")
                 with c3: st.metric("Mean Score", f"{df['Score'].mean():.3f}")
 
